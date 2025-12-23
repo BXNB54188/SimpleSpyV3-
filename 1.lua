@@ -2002,75 +2002,75 @@ end
 ]]
 -- Copies the contents of the codebox
 newButton(
-    "Copy Code",
-    function() return "Click to copy code" end,
+    "复制代码",
+    function() return "单击以复制代码" end,
     function()
         setclipboard(codebox:getString())
-        TextLabel.Text = "Copied successfully!"
+        TextLabel.Text = "复制成功！"
     end
 )
 
 --- Copies the source script (that fired the remote)
 newButton(
-    "Copy Remote",
-    function() return "Click to copy the path of the remote" end,
+    "复制遥控器",
+    function() return "单击以复制遥控器的路径" end,
     function()
         if selected and selected.Remote then
             setclipboard(v2s(selected.Remote))
-            TextLabel.Text = "Copied!"
+            TextLabel.Text = "复制了！"
         end
     end
 )
 
 -- Executes the contents of the codebox through loadstring
-newButton("Run Code",
-    function() return "Click to execute code" end,
+newButton("运行代码",
+    function() return "单击以执行代码" end,
     function()
         local Remote = selected and selected.Remote
         if Remote then
-            TextLabel.Text = "Executing..."
+            TextLabel.Text = "执行..."
             xpcall(function()
                 local returnvalue
-                if Remote:IsA("RemoteEvent") then
+                if Remote:IsA("远程事件") or Remote:IsA("不可靠的远程事件") then
                     returnvalue = Remote:FireServer(unpack(selected.args))
                 else
                     returnvalue = Remote:InvokeServer(unpack(selected.args))
                 end
 
-                TextLabel.Text = ("Executed successfully!\n%s"):format(v2s(returnvalue))
+                TextLabel.Text = ("已成功执行!\n%s"):format(v2s(returnvalue))
             end,function(err)
-                TextLabel.Text = ("Execution error!\n%s"):format(err)
+                TextLabel.Text = ("执行错误!\n%s"):format(err)
             end)
             return
         end
-        TextLabel.Text = "Source not found"
+        TextLabel.Text = "找不到源"
     end
 )
 
 --- Gets the calling script (not super reliable but w/e)
 newButton(
-    "Get Script",
-    function() return "Click to copy calling script to clipboard\nWARNING: Not super reliable, nil == could not find" end,
+    "获取脚本",
+    function() return "单击以将调用脚本复制到剪贴板\n警告：不是超级可靠, nil == could not find" end,
     function()
         if selected then
             if not selected.Source then
                 selected.Source = rawget(getfenv(selected.Function),"script")
             end
             setclipboard(v2s(selected.Source))
-            TextLabel.Text = "Done!"
+            TextLabel.Text = "完成!"
         end
     end
 )
 
 --- Decompiles the script that fired the remote and puts it in the code box
-newButton("Function Info",function() return "Click to view calling function information" end,
+newButton("函数信息",function() return "点击查看调用函数信息" end,
 function()
     local func = selected and selected.Function
     if func then
         local typeoffunc = typeof(func)
 
         if typeoffunc ~= 'string' then
-            codebox:setRaw("--[[Generating Function Info please wait]]")
+            codebox:setRaw("--[[正在生成函数信息请稍候]]")
             RunService.Heartbeat:Wait()
             local lclosure = islclosure(func)
             local SourceScript = rawget(getfenv(func),"script")
@@ -2079,7 +2079,7 @@ function()
             
             info = {
                 info = getinfo(func),
-                constants = lclosure and deepclone(getconstants(func)) or "N/A --Lua Closure expected got C Closure",
+                constants = lclosure and deepclone(getconstants(func)) or "N/A --Lua闭包预期得到C闭包",
                 upvalues = deepclone(getupvalues(func)),
                 script = {
                     SourceScript = SourceScript or 'nil',
@@ -2090,150 +2090,167 @@ function()
             if configs.advancedinfo then
                 local Remote = selected.Remote
 
-                info["advancedinfo"] = {
+                info["高级信息"] = {
                     Metamethod = selected.metamethod,
                     DebugId = {
-                        SourceScriptDebugId = SourceScript and typeof(SourceScript) == "Instance" and OldDebugId(SourceScript) or "N/A",
-                        CallingScriptDebugId = CallingScript and typeof(SourceScript) == "Instance" and OldDebugId(CallingScript) or "N/A",
+                        SourceScriptDebugId = SourceScript and typeof(SourceScript) == "实例" and OldDebugId(SourceScript) or "N/A",
+                        CallingScriptDebugId = CallingScript and typeof(SourceScript) == "实例" and OldDebugId(CallingScript) or "N/A",
                         RemoteDebugId = OldDebugId(Remote)
                     },
-                    Protos = lclosure and getprotos(func) or "N/A --Lua Closure expected got C Closure"
+                    Protos = lclosure and getprotos(func) or "N/A --Lua闭包预期得到C闭包"
                 }
 
-                if Remote:IsA("RemoteFunction") then
-                    info["advancedinfo"]["OnClientInvoke"] = getcallbackmember and (getcallbackmember(Remote,"OnClientInvoke") or "N/A") or "N/A --Missing function getcallbackmember"
+                if Remote:IsA("远程功能") then
+                    info["高级信息"]["在客户端调用时"] = (function()
+                        local getcallback = getcallbackvalue or getcallbackmember
+                        if not (getcallback and type(getcallback) == "function") then
+                            return "N/A -- 缺少getcallback函数"
+                        end
+                        
+                        local success, result = pcall(function()
+                            return getcallback(Remote, "在客户端调用时")
+                        end)
+                        
+                        if success then
+                            if result then
+                                return tostring(result) .. " --[[找到回调]]"
+                            end
+                        else
+                            return "N/A"
+                        end
+                    end)()
                 elseif getconnections then
-                    info["advancedinfo"]["OnClientEvents"] = {}
+                    info["高级信息"]["关于客户端事件"] = {}
 
                     for i,v in next, getconnections(Remote.OnClientEvent) do
-                        info["advancedinfo"]["OnClientEvents"][i] = {
+                        info["高级信息"]["关于客户端事件"][i] = {
                             Function = v.Function or "N/A",
                             State = (v and typeof(v) == "table" and v.State) or "N/A" 
                         }
                     end
                 end
             end
-            codebox:setRaw("--[[Converting table to string please wait]]")
+            codebox:setRaw("--[[正在将表转换为字符串请稍候]]")
             selected.Function = v2v({functionInfo = info})
         end
-        codebox:setRaw("-- Calling function info\n-- Generated by the SimpleSpy V3 serializer\n\n"..selected.Function)
-        TextLabel.Text = "Done! Function info generated by the SimpleSpy V3 Serializer."
+        codebox:setRaw("-- 调用函数信息\n-- 由SimpleSpy V3序列化程序生成\n\n"..selected.Function)
+        TextLabel.Text = "完成！由SimpleSpy V3序列化程序生成的函数信息。"
     else
-        TextLabel.Text = "Error! Selected function was not found."
+        TextLabel.Text = "错误！找不到所选函数。"
     end
 end)
 
 --- Clears the Remote logs
 newButton(
-    "Clr Logs",
-    function() return "Click to clear logs" end,
+    "Clr日志",
+    function() return "单击以清除日志" end,
     function()
-        TextLabel.Text = "Clearing..."
+        TextLabel.Text = "清除..."
         clear(logs)
         for i,v in next, LogList:GetChildren() do
-            if not v:IsA("UIListLayout") then
+            if not v:IsA("UIList布局") then
                 v:Destroy()
             end
         end
         codebox:setRaw("")
         selected = nil
-        TextLabel.Text = "Logs cleared!"
+        TextLabel.Text = "已清除日志!"
     end
 )
 
 --- Excludes the selected.Log Remote from the RemoteSpy
 newButton(
-    "Exclude (i)",
-    function() return "Click to exclude this Remote.\nExcluding a remote makes SimpleSpy ignore it, but it will continue to be usable." end,
+    "排除 (i)“,
+    function() return "单击以排除此遥控器。\n排除遥控器会使SimpleSpy忽略它，但它将继续可用。” end,
     function()
         if selected then
             blacklist[OldDebugId(selected.Remote)] = true
-            TextLabel.Text = "Excluded!"
+            TextLabel.Text = "排除!"
         end
     end
 )
 
 --- Excludes all Remotes that share the same name as the selected.Log remote from the RemoteSpy
 newButton(
-    "Exclude (n)",
-    function() return "Click to exclude all remotes with this name.\nExcluding a remote makes SimpleSpy ignore it, but it will continue to be usable." end,
+    "排除 (n)",
+    function() return "单击以排除具有此名称的所有遥控器。\n排除遥控器会使SimpleSpy忽略它，但它将继续可用。" end,
     function()
         if selected then
             blacklist[selected.Name] = true
-            TextLabel.Text = "Excluded!"
+            TextLabel.Text = "排除!"
         end
     end
 )
 
 --- clears blacklist
-newButton("Clr Blacklist",
-function() return "Click to clear the blacklist.\nExcluding a remote makes SimpleSpy ignore it, but it will continue to be usable." end,
+newButton("Clr黑名单",
+function() return "单击以清除黑名单。\n排除遥控器会使SimpleSpy忽略它，但它将继续可用。" end,
 function()
     blacklist = {}
-    TextLabel.Text = "Blacklist cleared!"
+    TextLabel.Text = "黑名单清除！"
 end)
 
 --- Prevents the selected.Log Remote from firing the server (still logged)
 newButton(
-    "Block (i)",
-    function() return "Click to stop this remote from firing.\nBlocking a remote won't remove it from SimpleSpy logs, but it will not continue to fire the server." end,
+    "阻止 (i)",
+    function() return "单击可停止此遥控器启动。\n阻止遥控器不会将其从SimpleSpy日志中删除，但不会继续启动服务器。" end,
     function()
         if selected then
             blocklist[OldDebugId(selected.Remote)] = true
-            TextLabel.Text = "Excluded!"
+            TextLabel.Text = "排除!"
         end
     end
 )
 
 --- Prevents all remotes from firing that share the same name as the selected.Log remote from the RemoteSpy (still logged)
-newButton("Block (n)",function()
-    return "Click to stop remotes with this name from firing.\nBlocking a remote won't remove it from SimpleSpy logs, but it will not continue to fire the server." end,
+newButton("阻止 (n)",function()
+    return "单击以阻止使用此名称的遥控器启动。\n阻止遥控器不会将其从SimpleSpy日志中删除，但不会继续启动服务器。” end,
     function()
         if selected then
             blocklist[selected.Name] = true
-            TextLabel.Text = "Excluded!"
+            TextLabel.Text = "排除!"
         end
     end
 )
 
 --- clears blacklist
 newButton(
-    "Clr Blocklist",
-    function() return "Click to stop blocking remotes.\nBlocking a remote won't remove it from SimpleSpy logs, but it will not continue to fire the server." end,
+    "Clr阻止列表",
+    function() return "单击以停止阻止遥控器。\n阻止遥控器不会将其从SimpleSpy日志中删除，但不会继续启动服务器。" end,
     function()
         blocklist = {}
-        TextLabel.Text = "Blocklist cleared!"
+        TextLabel.Text = "黑名单清除！"
     end
 )
 
 --- Attempts to decompile the source script
-newButton("Decompile",
+newButton("反编译",
     function()
-        return "Decompile source script"
+        return "反编译源代码"
     end,function()
         if decompile then
             if selected and selected.Source then
                 local Source = selected.Source
                 if not DecompiledScripts[Source] then
-                    codebox:setRaw("--[[Decompiling]]")
+                    codebox:setRaw("--[[反编译]]")
 
                     xpcall(function()
-                        local decompiledsource = decompile(Source):gsub("-- Decompiled with the Synapse X Luau decompiler.","")
+                        local decompiledsource = decompile(Source):gsub("-- 用Synapse X Luau反编译器反编译。","")
                         local Sourcev2s = v2s(Source)
                         if (decompiledsource):find("script") and Sourcev2s then
-                            DecompiledScripts[Source] = ("local script = %s\n%s"):format(Sourcev2s,decompiledsource)
+                            DecompiledScripts[Source] = ("本地脚本 = %s\n%s"):format(Sourcev2s,decompiledsource)
                         end
                     end,function(err)
-                        return codebox:setRaw(("--[[\nAn error has occured\n%s\n]]"):format(err))
+                        return codebox:setRaw(("--[[\n发生错误\n%s\n]]"):format(err))
                     end)
                 end
-                codebox:setRaw(DecompiledScripts[Source] or "--No Source Found")
-                TextLabel.Text = "Done!"
+                codebox:setRaw(DecompiledScripts[Source] or "--找不到源")
+                TextLabel.Text = "完成!"
             else
-                TextLabel.Text = "Source not found!"
+                TextLabel.Text = "找不到源！"
             end
         else
-            TextLabel.Text = "Missing function (decompile)"
+            TextLabel.Text = "缺少函数（反编译）"
         end
     end
 )
@@ -2257,31 +2274,31 @@ newButton("Decompile",
     )]]
 
 newButton(
-    "Disable Info",
-    function() return string.format("[%s] Toggle function info (because it can cause lag in some games)", configs.funcEnabled and "ENABLED" or "DISABLED") end,
+    "禁用信息",
+    function() return string.format("[%s] 切换功能信息（因为它会在某些游戏中导致延迟）", configs.funcEnabled and "已启用" or "有残疾的") end,
     function()
         configs.funcEnabled = not configs.funcEnabled
-        TextLabel.Text = string.format("[%s] Toggle function info (because it can cause lag in some games)", configs.funcEnabled and "ENABLED" or "DISABLED")
+        TextLabel.Text = string.format("[%s] 切换功能信息（因为在某些游戏中会导致延迟)", configs.funcEnabled and "已启用" or "有残疾的")
     end
 )
 
 newButton(
-    "Autoblock",
-    function() return string.format("[%s] [BETA] Intelligently detects and excludes spammy remote calls from logs", configs.autoblock and "ENABLED" or "DISABLED") end,
+    "自动闭塞",
+    function() return string.format("[%s] [测试版]智能检测并从日志中排除垃圾远程呼叫", configs.autoblock and "已启用" or "有残疾的") end,
     function()
         configs.autoblock = not configs.autoblock
-        TextLabel.Text = string.format("[%s] [BETA] Intelligently detects and excludes spammy remote calls from logs", configs.autoblock and "ENABLED" or "DISABLED")
+        TextLabel.Text = string.format("[%s] [测试版]智能检测并从日志中排除垃圾远程呼叫", configs.autoblock and "已启用" or "有残疾的")
         history = {}
         excluding = {}
     end
 )
 
-newButton("Logcheckcaller",function()
-    return ("[%s] Log remotes fired by the client"):format(configs.logcheckcaller and "ENABLED" or "DISABLED")
+newButton("日志检查调用程序",function()
+    return ("[%s] 记录客户端触发的远程"):format(configs.logcheckcaller and "已启用" or "有残疾的")
 end,
 function()
     configs.logcheckcaller = not configs.logcheckcaller
-    TextLabel.Text = ("[%s] Log remotes fired by the client"):format(configs.logcheckcaller and "ENABLED" or "DISABLED")
+    TextLabel.Text = ("[%s] 记录客户端触发的远程"):format(configs.logcheckcaller and "已启用" or "有残疾的")
 end)
 
 --[[newButton("Log returnvalues",function()
@@ -2292,20 +2309,20 @@ function()
     TextLabel.Text = ("[BETA] [%s] Log RemoteFunction's return values"):format(configs.logreturnvalues and "ENABLED" or "DISABLED")
 end)]]
 
-newButton("Advanced Info",function()
-    return ("[%s] Display more remoteinfo"):format(configs.advancedinfo and "ENABLED" or "DISABLED")
+newButton("高级信息",function()
+    return ("[%s] 显示更多remoteinfo"):format(configs.advancedinfo and "已启用" or "有残疾的")
 end,
 function()
     configs.advancedinfo = not configs.advancedinfo
-    TextLabel.Text = ("[%s] Display more remoteinfo"):format(configs.advancedinfo and "ENABLED" or "DISABLED")
+    TextLabel.Text = ("[%s] 显示更多remoteinfo"):format(configs.advancedinfo and "已启用" or "有残疾的")
 end)
 
-newButton("Join Discord",function()
-    return "Joins The Simple Spy Discord"
+newButton("加入Discord",function()
+    return "加入SimpleSpy的Discord"
 end,
 function()
     setclipboard("https://discord.com/invite/AWS6ez9")
-    TextLabel.Text = "Copied invite to your clipboard"
+    TextLabel.Text = "已将邀请复制到剪贴板"
     if request then
         request({Url = 'http://127.0.0.1:6463/rpc?v=1',Method = 'POST',Headers = {['Content-Type'] = 'application/json', Origin = 'https://discord.com'},Body = http:JSONEncode({cmd = 'INVITE_BROWSER',nonce = http:GenerateGUID(false),args = {code = 'AWS6ez9'}})})
     end
